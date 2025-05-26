@@ -1,0 +1,137 @@
+{
+  "ORDER-001": {
+    "orderId": "ORDER-001",
+    "customerName": "山田 太郎",
+    "address": "〒100-0001 東京都千代田区千代田1-1-1",
+    "phoneNumber": "03-1234-5678",
+    "email": "yamada.taro@example.com",
+    "orderDate": "2025-01-26",
+    "deliveryDate": "2025-02-05"
+  },
+  "ORDER-002": {
+    "orderId": "ORDER-002",
+    "customerName": "鈴木 花子",
+    "address": "〒150-0002 東京都渋谷区渋谷2-2-2",
+    "phoneNumber": "03-2345-6789",
+    "email": "suzuki.hanako@example.com",
+    "orderDate": "2025-01-26",
+    "deliveryDate": "2025-02-05"
+  },
+  "ORDER-003": {
+    "orderId": "ORDER-003",
+    "customerName": "佐藤 次郎",
+    "address": "〒160-0003 東京都新宿区新宿3-3-3",
+    "phoneNumber": "03-3456-7890",
+    "email": "sato.jiro@example.com",
+    "orderDate": "2025-01-26",
+    "deliveryDate": "2025-02-05"
+  },
+  "ORDER-004": {
+    "orderId": "ORDER-004",
+    "customerName": "田中 美香",
+    "address": "〒170-0004 東京都豊島区池袋4-4-4",
+    "phoneNumber": "03-4567-8901",
+    "email": "tanaka.mika@example.com",
+    "orderDate": "2025-01-26",
+    "deliveryDate": "2025-02-05"
+  },
+  "ORDER-005": {
+    "orderId": "ORDER-005",
+    "customerName": "高橋 健一",
+    "address": "〒110-0005 東京都台東区上野5-5-5",
+    "phoneNumber": "03-5678-9012",
+    "email": "takahashi.kenichi@example.com",
+    "orderDate": "2025-01-26",
+    "deliveryDate": "2025-02-05"
+  },
+  "ORDER-006": {
+    "orderId": "ORDER-006",
+    "customerName": "伊藤 優子",
+    "address": "〒140-0006 東京都品川区品川6-6-6",
+    "phoneNumber": "03-6789-0123",
+    "email": "ito.yuko@example.com",
+    "orderDate": "2025-01-27",
+    "deliveryDate": "2025-02-06"
+  },
+  "ORDER-007": {
+    "orderId": "ORDER-007",
+    "customerName": "渡辺 誠",
+    "address": "〒130-0007 東京都墨田区墨田7-7-7",
+    "phoneNumber": "03-7890-1234",
+    "email": "watanabe.makoto@example.com",
+    "orderDate": "2025-01-27",
+    "deliveryDate": "2025-02-06"
+  },
+  "ORDER-008": {
+    "orderId": "ORDER-008",
+    "customerName": "中村 愛",
+    "address": "〒180-0008 東京都武蔵野市吉祥寺8-8-8",
+    "phoneNumber": "0422-89-0123",
+    "email": "nakamura.ai@example.com",
+    "orderDate": "2025-01-27",
+    "deliveryDate": "2025-02-06"
+  },
+  "ORDER-009": {
+    "orderId": "ORDER-009",
+    "customerName": "小林 大輔",
+    "address": "〒190-0009 東京都立川市立川9-9-9",
+    "phoneNumber": "042-890-1234",
+    "email": "kobayashi.daisuke@example.com",
+    "orderDate": "2025-01-27",
+    "deliveryDate": "2025-02-06"
+  },
+  "ORDER-010": {
+    "orderId": "ORDER-010",
+    "customerName": "加藤 真由美",
+    "address": "〒120-0010 東京都足立区足立10-10-10",
+    "phoneNumber": "03-9012-3456",
+    "email": "kato.mayumi@example.com",
+    "orderDate": "2025-01-27",
+    "deliveryDate": "2025-02-06"
+  },
+  "ORDER-011": {
+    "orderId": "ORDER-011",
+    "customerName": "吉田 隆",
+    "address": "〒111-0011 東京都台東区浅草11-11-11",
+    "phoneNumber": "03-0123-4567",
+    "email": "yoshida.takashi@example.com",
+    "orderDate": "2025-01-28",
+    "deliveryDate": "2025-02-07"
+  },
+  "ORDER-012": {
+    "orderId": "ORDER-012",
+    "customerName": "山本 恵子",
+    "address": "〒112-0012 東京都文京区文京12-12-12",
+    "phoneNumber": "03-1234-5678",
+    "email": "yamamoto.keiko@example.com",
+    "orderDate": "2025-01-28",
+    "deliveryDate": "2025-02-07"
+  },
+  "ORDER-013": {
+    "orderId": "ORDER-013",
+    "customerName": "松本 光",
+    "address": "〒113-0013 東京都文京区本郷13-13-13",
+    "phoneNumber": "03-2345-6789",
+    "email": "matsumoto.hikaru@example.com",
+    "orderDate": "2025-01-28",
+    "deliveryDate": "2025-02-07"
+  },
+  "ORDER-014": {
+    "orderId": "ORDER-014",
+    "customerName": "井上 さくら",
+    "address": "〒114-0014 東京都北区北14-14-14",
+    "phoneNumber": "03-3456-7890",
+    "email": "inoue.sakura@example.com",
+    "orderDate": "2025-01-28",
+    "deliveryDate": "2025-02-07"
+  },
+  "ORDER-015": {
+    "orderId": "ORDER-015",
+    "customerName": "木村 浩二",
+    "address": "〒115-0015 東京都北区赤羽15-15-15",
+    "phoneNumber": "03-4567-8901",
+    "email": "kimura.koji@example.com",
+    "orderDate": "2025-01-28",
+    "deliveryDate": "2025-02-07"
+  }
+}

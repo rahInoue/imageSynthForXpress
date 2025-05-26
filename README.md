@@ -11,6 +11,7 @@
 - 画像ごとのキー（識別子）表示
 - ページ分割機能（多数の画像を複数シートに自動分割）
 - 生成されたレイヤー画像からPSDファイルを作成
+- 統合処理スクリプトによる自動化
 
 ## 必要条件
 
@@ -34,15 +35,43 @@ npm install ag-psd canvas
 
 ## 使用方法
 
-### 基本的な使い方（Python版）
+### 統合処理（推奨）
+
+画像合成からPSD生成まで一連の処理を自動実行:
 
 ```bash
-python3 index.py --images "$(cat images.json)" --sheet 280x580 --prefix output
+./process_all.sh
 ```
 
-### PSD生成（Node.js版）
+オプション:
+- `-i, --images FILE` - 画像情報JSONファイル（デフォルト: images.json）
+- `-s, --sheet SIZE` - シートサイズ mm（デフォルト: 280x580）
+- `-o, --output-dir DIR` - 出力ディレクトリ（デフォルト: output）
+- `-p, --psd-dir DIR` - PSD出力ディレクトリ（デフォルト: psd_output）
+- `--prefix PREFIX` - ファイル名プレフィックス（デフォルト: sheet）
+- `--one-page` - ページ分割せず1シートに出力
+- `-h, --help` - ヘルプメッセージを表示
 
-Python版で生成されたPNG画像から、Adobe Photoshop形式（PSD）ファイルを作成します:
+使用例:
+```bash
+# カスタム設定で実行
+./process_all.sh -i custom_images.json -s 300x600
+
+# 単一ページモードで実行
+./process_all.sh --one-page
+```
+
+### 個別実行
+
+#### 1. 画像合成（Python版）
+
+```bash
+python3 index.py --images "$(cat images.json)" --sheet 280x580 --prefix sheet
+```
+
+#### 2. PSD生成（Node.js版）
+
+Python版で生成されたPNG画像から、Adobe Photoshop形式（PSD）ファイルを作成:
 
 ```bash
 node makePSD.js
@@ -141,13 +170,21 @@ python3 index.py --images "$(cat many_images.json)" --sheet 280x580 --prefix she
 
 ```python
 # ---- 主要パラメータ ----------------------------------------------------------
-CARD_PX = (768, 1024)                # カードサイズ (w,h) 固定
-CUTLINE_MM = 2.0                     # 黒線幅
-MARGIN_MM = 10.0                     # シート外周
-SPACING_MM = 10.0                    # カード間
-KNOCKOUT_SHRINK_MM = 0.2             # 白抜き縮小量
+CARD_PX = (768, 1024)                # カードサイズ（ピクセル）固定値
+CUTLINE_MM = 2.0                     # カットライン（黒線）の幅（ミリメートル）
+MARGIN_MM = 10.0                     # シート外周の余白（ミリメートル）
+SPACING_MM = 10.0                    # カード間の間隔（ミリメートル）
+KNOCKOUT_SHRINK_MM = 0.2             # 白抜き（ノックアウト）の縮小量（ミリメートル）
 # -----------------------------------------------------------------------------
 ```
+
+## 処理フロー
+
+1. **画像情報の準備** - images.jsonファイルに処理する画像のパスと識別子を記載
+2. **画像合成処理** - index.pyがPNG形式のレイヤー画像を生成
+3. **PSD生成処理** - makePSD.jsが生成されたPNG画像からPSDファイルを作成
+
+統合処理スクリプト（process_all.sh）を使用することで、これらの処理を一度に実行できます。
 
 ## ライセンス
 
