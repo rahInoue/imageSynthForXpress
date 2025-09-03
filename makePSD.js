@@ -11,6 +11,7 @@ const LAYER_NAMES = [
   'sheet_labels.png',
   'sheet_cutline.png',
   'sheet_glare.png',
+  'sheet_logos.png',      // ロゴレイヤーを追加（characterの上）
   'sheet_character.png',
   'sheet_char_knock.png',
   'sheet_bg_knock.png',

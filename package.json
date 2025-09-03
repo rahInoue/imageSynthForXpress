@@ -4,15 +4,20 @@
   "description": "アクリルシート印刷用の画像合成ツールです。キャラクター画像と背景画像を合成し、カットライン、グレア、キャラクターシルエット、背景ノックアウトなど、印刷用の各種レイヤーを生成します。",
   "main": "makePSD.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "download-images": "node downloadFromR2.js download_images.json --output-dir images --update-json",
+    "download-order-images": "node downloadOrderImages.js 202508/2025_order_goods_list.json",
+    "make-order-images": "node makeOrderImages.js"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.0.0",
     "ag-psd": "^28.1.0",
     "canvas": "^3.1.0",
     "commander": "^13.1.0",
+    "dotenv": "^16.0.0",
     "pdf-lib": "^1.17.1",
     "psd": "^3.4.0"
   }

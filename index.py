@@ -5,6 +5,8 @@ from typing import List, Tuple, Dict
 import math
 
 from PIL import Image, ImageDraw, ImageOps, ImageFilter
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 DPI = 350
 MM_PER_INCH = 25.4
@@ -27,6 +29,53 @@ MARGIN_PX = mm_to_px(MARGIN_MM)
 SPACING_PX = mm_to_px(SPACING_MM)
 KNOCKOUT_SHRINK_PX = max(1, mm_to_px(KNOCKOUT_SHRINK_MM))
 
+# Quality & scaling policy
+ALLOW_UPSCALE_CHAR = False   # 文字やキャラクターは基本的に拡大しない（甘くなるため）
+ALLOW_UPSCALE_BG   = True    # 背景は必要ならカバーのために拡大を許可
+
+def resize_char_canvas(im: Image.Image, target_wh: Tuple[int,int], allow_upscale: bool = ALLOW_UPSCALE_CHAR) -> Image.Image:
+    """等比でtarget内にフィット（レターボックス）。αを保持。拡大は既定で抑制。"""
+    tw, th = target_wh
+    w, h = im.size
+    scale = min(tw / w, th / h)
+    if not allow_upscale:
+        scale = min(scale, 1.0)
+    new_w, new_h = max(1, int(round(w*scale))), max(1, int(round(h*scale)))
+    if (new_w, new_h) != (w, h):
+        im = im.resize((new_w, new_h), Image.LANCZOS)
+    # 中央配置のキャンバスに合成してCARD_PXの厳密サイズにする
+    canvas = Image.new("RGBA", (tw, th), (0,0,0,0))
+    x = (tw - im.size[0]) // 2
+    y = (th - im.size[1]) // 2
+    canvas.paste(im, (x, y), im)
+    return canvas
+
+def resize_bg_canvas(im: Image.Image, target_wh: Tuple[int,int], allow_upscale: bool = ALLOW_UPSCALE_BG) -> Image.Image:
+    """背景は基本『カバー』。不足側はクロップ。必要なら拡大も許可（印刷向け）。"""
+    tw, th = target_wh
+    w, h = im.size
+    # まずアップスケールを抑制したい時は、上限を1.0に
+    scale = max(tw / w, th / h)
+    if not allow_upscale:
+        scale = min(scale, 1.0)
+    new_w, new_h = max(1, int(round(w*scale))), max(1, int(round(h*scale)))
+    if (new_w, new_h) != (w, h):
+        im = im.resize((new_w, new_h), Image.LANCZOS)
+    # 中心トリミングでちょうどtargetに合わせる（新サイズがtarget以上であることが前提）
+    left = max(0, (im.size[0] - tw)//2)
+    top  = max(0, (im.size[1] - th)//2)
+    right = left + tw if im.size[0] >= tw else im.size[0]
+    bottom = top + th if im.size[1] >= th else im.size[1]
+    crop = im.crop((left, top, right, bottom))
+    # もし片側が足りない場合（allow_upscale=Falseで小さいまま）、キャンバスでレターボックス化
+    if crop.size != (tw, th):
+        canvas = Image.new("RGBA", (tw, th), (0,0,0,0))
+        x = (tw - crop.size[0]) // 2
+        y = (th - crop.size[1]) // 2
+        canvas.paste(crop, (x, y), crop)
+        return canvas
+    return crop
+
 
 def grid_layout(
     sheet_px: Tuple[int, int],
@@ -38,12 +87,12 @@ def grid_layout(
 ):
     """カード左上座標を返す簡易グリッドレイアウト"""
     fw, fh = card_px[0] + border_px * 2, card_px[1] + border_px * 2
-    
+
     # 左右で異なるマージンを使う場合
     right_margin_px = margin_px
     if left_margin_px is None:
         left_margin_px = margin_px
-        
+
     usable_w = sheet_px[0] - left_margin_px - right_margin_px
     usable_h = sheet_px[1] - margin_px * 2
 
@@ -60,12 +109,56 @@ def grid_layout(
 
 
 def load_images(image_info: List[Dict]) -> List[Dict]:
-    """各カード用に {key, char_img, bg_img} を読み込む"""
+    """各カード用に {key, char_img, bg_img, logo_img, userName, amount} を読み込む"""
     cards = []
-    for info in image_info:
-        char = Image.open(info["char"]).convert("RGBA").resize(CARD_PX)
-        bg   = Image.open(info["bg"]).convert("RGBA").resize(CARD_PX)
-        cards.append({"key": info["key"], "char": char, "bg": bg})
+    for idx, info in enumerate(image_info):
+        try:
+            print(f"Loading item {idx + 1}/{len(image_info)}: {info['key']} (char: {info['char']})")
+            char = Image.open(info["char"]).convert("RGBA")
+            
+            # 背景画像の読み込み（nullの場合はデフォルト背景を作成）
+            bg = None
+            if info.get("bg"):
+                print(f"  Loading background: {info['bg']}")
+                bg = Image.open(info["bg"]).convert("RGBA")
+            else:
+                # 背景がない場合は透明な背景を作成
+                print(f"  No background, creating transparent background")
+                bg = Image.new("RGBA", CARD_PX, (0, 0, 0, 0))
+            
+            # ロゴ画像の読み込み（オプショナル）
+            logo = None
+            if "logo" in info and info["logo"]:
+                try:
+                    print(f"  Loading logo: {info['logo']}")
+                    logo = Image.open(info["logo"]).convert("RGBA")
+                except Exception as e:
+                    print(f"Warning: Failed to load logo {info['logo']}: {e}")
+            
+            # amountに応じて同じカードを複数追加
+            amount = info.get("amount", 1)
+            print(f"  Amount: {amount}, userName: {info.get('userName', info['key'])}")
+            
+            for _ in range(amount):
+                cards.append({
+                    "key": info["key"],
+                    "char": char,
+                    "bg": bg,
+                    "bg_path": info.get("bg"),  # 元のbgパス情報を保持（nullチェック用）
+                    "logo": logo,
+                    "userName": info.get("userName", info["key"]),  # userNameがない場合はkeyを使用
+                    "orderId": info.get("orderId", "")
+                })
+                
+        except Exception as e:
+            print(f"\nERROR processing item {idx + 1}: {info}")
+            print(f"Error details: {e}")
+            print(f"Char path: {info.get('char', 'N/A')}")
+            print(f"Bg path: {info.get('bg', 'N/A')}")
+            print(f"Logo path: {info.get('logo', 'N/A')}")
+            raise
+            
+    print(f"\nSuccessfully loaded {len(cards)} cards from {len(image_info)} items")
     return cards
 
 
@@ -77,50 +170,71 @@ def make_sheet_layers(
     # --- シート寸法 ---
     # 実際のシート寸法をピクセルに変換（余白なし）
     sheet_px_original = (mm_to_px(sheet_mm[0]), mm_to_px(sheet_mm[1]))
-    
+
     # 左側のラベル用に余分なマージンを追加（シートサイズは変わらない）
     label_margin_mm = 50  # ラベル表示用の左側追加マージン（ミリメートル）- キー識別子の表示スペース確保
     label_margin_px = mm_to_px(label_margin_mm)
-    
+
     # デバッグ情報
     print(f"シート寸法(mm): {sheet_mm[0]} x {sheet_mm[1]}")
     print(f"シート寸法(px): {sheet_px_original[0]} x {sheet_px_original[1]}")
     print(f"ラベル用マージン: {label_margin_mm}mm ({label_margin_px}px)")
-    
+
     # シート寸法はそのまま使用
     sheet_size = sheet_px_original
-    
+
     # MARGINを調整 - 左側だけ増やす
     left_margin_px = MARGIN_PX + label_margin_px
     # --- レイヤ初期化 ---
     layers = {
         "cutline": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "glare":   Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
+        "logos":   Image.new("RGBA", sheet_size, (0, 0, 0, 0)),  # ロゴレイヤー（キャラクターの上）
         "character": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "char_knock": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "bg_knock": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "background": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
-        "labels": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),  # キーラベル用の新しいレイヤー
+        "labels": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),  # ユーザー名ラベル用
     }
     draw_cut = ImageDraw.Draw(layers["cutline"])
-    
-    # フォント設定 (Pillow の標準フォントを使用)
+
+    # フォント設定 (日本語フォントを優先的に使用)
     try:
         from PIL import ImageFont
-        # MacOS でよく使われるフォントを試す
-        font_size = 120  # 5倍の大きさに変更
-        try:
-            font = ImageFont.truetype("Arial.ttf", font_size)
-        except IOError:
+        # MacOS でよく使われる日本語フォントを試す
+        font_size = 100  # フォントサイズを調整
+        font = None
+        
+        # 利用可能な日本語フォントのリスト
+        japanese_fonts = [
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",  # これは存在することを確認済み
+            "/System/Library/Fonts/PingFang.ttc",  # 中国語フォントだが日本語も表示可能
+            "/System/Library/Fonts/STHeiti Light.ttc",
+            "/System/Library/Fonts/STHeiti Medium.ttc"
+        ]
+        
+        # フォントを順に試す
+        for font_path in japanese_fonts:
             try:
+                font = ImageFont.truetype(font_path, font_size, index=0)
+                print(f"Using font: {font_path}")
+                break
+            except Exception as e:
+                continue
+        
+        # 日本語フォントが見つからない場合
+        if font is None:
+            try:
+                # 最後の手段としてArialを使用
                 font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", font_size)
+                print("Warning: Using Helvetica font - Japanese characters may not display correctly")
             except IOError:
-                try:
-                    font = ImageFont.truetype("/Library/Fonts/Arial.ttf", font_size)
-                except IOError:
-                    font = ImageFont.load_default()
+                font = ImageFont.load_default()
+                print("Warning: Using default font - Japanese characters will not display correctly")
+                
     except (IOError, ImportError):
         font = ImageFont.load_default()
+        print("Warning: Font loading failed - Japanese characters will not display correctly")
 
     # --- 配置計算 ---
     positions, rows, cols = grid_layout(
@@ -133,19 +247,33 @@ def make_sheet_layers(
 
     # --- カードごとに処理 ---
     for card, (x, y) in zip(card_data, positions):
-        char_img = card["char"]
-        bg_img   = card["bg"]
+        char_img_raw = card["char"]
+        bg_img_raw   = card["bg"]
+        logo_img_raw = card.get("logo")
+        user_name    = card.get("userName", card["key"])
+
+        # Downscale with high-quality LANCZOS; avoid unnecessary upscaling
+        char_img = resize_char_canvas(char_img_raw, CARD_PX, allow_upscale=ALLOW_UPSCALE_CHAR)
+        bg_img   = resize_bg_canvas(bg_img_raw, CARD_PX, allow_upscale=ALLOW_UPSCALE_BG)
 
         # background
         layers["background"].paste(bg_img, (x, y), bg_img)
 
-        # bg_knockout: 背景ノックアウト - カード領域全体を完全黒（不透明）で塗りつぶし
-        bg_mask = Image.new("L", CARD_PX, 255)
-        black_bg = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
-        layers["bg_knock"].paste(black_bg, (x, y), bg_mask)
+        # bg_knockout: 背景ノックアウト - 背景がある場合のみカード領域全体を完全黒（不透明）で塗りつぶし
+        # 背景がnullの場合（透明背景の場合）はbg_knockレイヤーも作成しない
+        if card.get("bg_path"):
+            bg_mask = Image.new("L", CARD_PX, 255)
+            black_bg = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
+            layers["bg_knock"].paste(black_bg, (x, y), bg_mask)
 
         # character
         layers["character"].paste(char_img, (x, y), char_img)
+        
+        # logo: ロゴ画像（キャラクターの上に配置）
+        if logo_img_raw:
+            # ロゴをカードサイズにリサイズ（レターボックス形式）
+            logo_img = resize_char_canvas(logo_img_raw, CARD_PX, allow_upscale=True)
+            layers["logos"].paste(logo_img, (x, y), logo_img)
 
         # character knockout: キャラクターノックアウト - アルファチャンネルを収縮させて黒シルエット生成
         alpha = char_img.split()[-1]  # アルファチャンネル（透明度情報）を抽出
@@ -166,8 +294,8 @@ def make_sheet_layers(
             [(bx1, by1), (bx2, by2)], outline=(0, 0, 0, 255), width=CUTLINE_PX
         )
         
-        # key テキスト描画: カード識別子を左側に-90度回転して配置
-        key_text = card["key"]  # カードの識別子（JSONで指定されたキー）
+        # userName テキスト描画: ユーザー名を左側に-90度回転して配置
+        key_text = user_name  # ユーザー名を表示
         # テキスト描画用の一時画像を作成（回転前の縦長サイズ）
         text_img = Image.new("RGBA", (CARD_PX[1], 600), (0, 0, 0, 0))  # 幅=カード高さ、高さ=600px
         text_draw = ImageDraw.Draw(text_img)
@@ -196,7 +324,7 @@ def make_sheet_layers(
         text_height = rotated_text.height
         
         # ラベル位置の微調整 - デフォルトではカードから離れすぎるため右側へシフト
-        label_right_shift = 280  # ラベルを右に280px移動 - 視認性向上のための位置調整
+        label_right_shift = 350  # ラベルを右に350px移動 - より右寄りに表示
         
         # カットラインの左側の座標（右に移動して画像に近づける）
         text_x = bx1 - label_margin - text_width + label_right_shift
@@ -212,6 +340,10 @@ def make_sheet_layers(
 
     # --- PNG 出力 ---
     for name, img in layers.items():
+        # logosレイヤーは存在する場合のみ保存
+        if name == "logos" and not any(card.get("logo") for card in card_data):
+            continue  # ロゴがない場合はスキップ
+        
         path = f"{output_prefix}_{name}.png"
         img.save(path, dpi=(DPI, DPI))
         print("Saved:", path)
@@ -224,21 +356,41 @@ def process_pages(
     output_prefix: str = "sheet",
     output_dir: str = ".",
 ):
-    """画像情報をページ分割して処理する"""
+    """画像情報をページ分割して処理する（orderIdごとにグループ化）"""
     import os
     from math import ceil
+    from collections import defaultdict
+    
+    # orderIdごとにグループ化
+    orders = defaultdict(list)
+    for item in image_info:
+        order_id = item.get("orderId", "no_order")
+        orders[order_id].append(item)
+    
+    # orderIdの順番でソート
+    sorted_order_ids = sorted(orders.keys(), key=lambda x: int(x) if x.isdigit() else float('inf'))
+    
+    # 全体のカードリストを再構築（orderIdごとにまとめる）
+    grouped_image_info = []
+    for order_id in sorted_order_ids:
+        grouped_image_info.extend(orders[order_id])
     
     # シート1枚あたりのカード数を計算 - ページ分割のための事前計算
     temp_sheet_px = (mm_to_px(sheet_mm[0]), mm_to_px(sheet_mm[1]))
     _, rows, cols = grid_layout(sheet_px=temp_sheet_px)
     cards_per_page = rows * cols  # 1ページに配置可能な最大カード数
     
+    # load_imagesで展開されたカードリストを作成（amountを考慮）
+    expanded_cards = load_images(grouped_image_info)
+    
     # 必要なページ数を計算
-    total_cards = len(image_info)
+    total_cards = len(expanded_cards)
     total_pages = ceil(total_cards / cards_per_page)
     
-    print(f"合計 {total_cards} 枚のカード、{total_pages} ページに分割します")
+    print(f"合計 {len(image_info)} アイテム → {total_cards} 枚のカード（amountを考慮）")
+    print(f"{total_pages} ページに分割します")
     print(f"1ページあたり 最大{cards_per_page}枚 ({cols}列 x {rows}行)")
+    print(f"Order IDs: {', '.join(sorted_order_ids)}")
     
     # ページごとに処理
     for page_no in range(1, total_pages + 1):
@@ -247,8 +399,8 @@ def process_pages(
         end_idx = min(page_no * cards_per_page, total_cards)
         
         # このページのカードデータを取得
-        page_image_info = image_info[start_idx:end_idx]
-        print(f"ページ {page_no}/{total_pages}: {len(page_image_info)} 枚のカード処理中...")
+        page_cards = expanded_cards[start_idx:end_idx]
+        print(f"ページ {page_no}/{total_pages}: {len(page_cards)} 枚のカード処理中...")
         
         # ページ用のディレクトリを作成（数字だけのフォルダ名）- makePSD.jsが認識できる形式
         page_dir = os.path.join(output_dir, f"{page_no}")  # 例: output/1, output/2
@@ -258,9 +410,8 @@ def process_pages(
         # このページ用の出力プレフィックス
         page_prefix = os.path.join(page_dir, output_prefix)
         
-        # このページのカードを処理
-        cards = load_images(page_image_info)
-        make_sheet_layers(sheet_mm=sheet_mm, card_data=cards, output_prefix=page_prefix)
+        # このページのカードを処理（既に展開済みなのでload_imagesは不要）
+        make_sheet_layers(sheet_mm=sheet_mm, card_data=page_cards, output_prefix=page_prefix)
         
         print(f"ページ {page_no} 完了: {page_dir}/*.png\n")
 
