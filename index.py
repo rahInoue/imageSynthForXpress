@@ -21,7 +21,9 @@ CARD_PX = (768, 1024)                # カードサイズ（ピクセル）固�
 CUTLINE_MM = 2.0                     # カットライン（黒線）の幅（ミリメートル）- 印刷時の切断基準線
 MARGIN_MM = 10.0                     # シート外周の余白（ミリメートル）- 印刷可能領域の境界
 SPACING_MM = 10.0                    # カード間の間隔（ミリメートル）- 各カードの配置間隔
-KNOCKOUT_SHRINK_MM = 0.2             # 白抜き（ノックアウト）の縮小量（ミリメートル）- シルエット生成時の収縮幅
+KNOCKOUT_SHRINK_MM = 0.1             # 白抜き（ノックアウト）の縮小量（ミリメートル）- 0.2から0.1に減少
+KNOCKOUT_THRESHOLD = 20              # 白板生成の閾値（0-255）- この値以下の透明度は無視
+KNOCKOUT_MIN_ALPHA = 80              # 白板として扱う最小の不透明度（0-255）- 薄い部分も白板化
 # -----------------------------------------------------------------------------
 
 CUTLINE_PX = mm_to_px(CUTLINE_MM)
@@ -166,7 +168,24 @@ def make_sheet_layers(
     sheet_mm: Tuple[float, float],
     card_data: List[Dict],
     output_prefix: str = "sheet",
+    knockout_shrink_mm: float = None,
+    knockout_mode: str = "normal",
 ):
+    # 引数でパラメータを調整
+    shrink_mm = knockout_shrink_mm if knockout_shrink_mm is not None else KNOCKOUT_SHRINK_MM
+    shrink_px = max(0, mm_to_px(shrink_mm))
+
+    # モードに応じた閾値設定
+    if knockout_mode == "aggressive":
+        threshold = 10   # より薄い部分も処理
+        min_alpha = 50   # より薄い部分も白板化
+    elif knockout_mode == "minimal":
+        threshold = 50   # 明確な部分のみ
+        min_alpha = 128  # 明確な部分のみ白板化
+    else:  # normal
+        threshold = KNOCKOUT_THRESHOLD
+        min_alpha = KNOCKOUT_MIN_ALPHA
+
     # --- シート寸法 ---
     # 実際のシート寸法をピクセルに変換（余白なし）
     sheet_px_original = (mm_to_px(sheet_mm[0]), mm_to_px(sheet_mm[1]))
@@ -190,6 +209,7 @@ def make_sheet_layers(
         "cutline": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "glare":   Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "logos":   Image.new("RGBA", sheet_size, (0, 0, 0, 0)),  # ロゴレイヤー（キャラクターの上）
+        "logo_knock": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),  # ロゴ用白板レイヤー
         "character": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "char_knock": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
         "bg_knock": Image.new("RGBA", sheet_size, (0, 0, 0, 0)),
@@ -275,9 +295,43 @@ def make_sheet_layers(
             logo_img = resize_char_canvas(logo_img_raw, CARD_PX, allow_upscale=True)
             layers["logos"].paste(logo_img, (x, y), logo_img)
 
+            # logo knockout: ロゴノックアウト - ロゴにも白板を生成
+            logo_alpha = logo_img.split()[-1]  # ロゴのアルファチャンネルを抽出
+
+            # ロゴ用の白板処理（完全2値化）
+            logo_alpha_processed = logo_alpha.point(lambda p:
+                0 if p < threshold else  # 閾値以下 → 完全透明
+                255  # 閾値以上 → 完全不透明（白板）
+            )
+
+            # 収縮処理（ロゴも同様に）
+            if shrink_px > 0:
+                logo_alpha_smooth = logo_alpha_processed.filter(ImageFilter.GaussianBlur(radius=0.3))
+                logo_knock = logo_alpha_smooth.filter(ImageFilter.MinFilter(3))
+            else:
+                logo_knock = logo_alpha_processed
+
+            black_logo = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
+            layers["logo_knock"].paste(black_logo, (x, y), logo_knock)
+
         # character knockout: キャラクターノックアウト - アルファチャンネルを収縮させて黒シルエット生成
         alpha = char_img.split()[-1]  # アルファチャンネル（透明度情報）を抽出
-        knock = alpha.filter(ImageFilter.MinFilter(KNOCKOUT_SHRINK_PX*2+1))  # MinFilterで収縮処理
+
+        # ステップ1: 白板用の完全2値化処理
+        # threshold以下は完全透明、それ以上は完全不透明
+        alpha_processed = alpha.point(lambda p:
+            0 if p < threshold else  # 閾値以下 → 完全透明
+            255  # 閾値以上 → 完全不透明（白板）
+        )
+
+        # ステップ2: 収縮処理（より穏やかに）
+        if shrink_px > 0:
+            # まず少しぼかしてからMinFilter（エッジを滑らかに）
+            alpha_smooth = alpha_processed.filter(ImageFilter.GaussianBlur(radius=0.3))
+            knock = alpha_smooth.filter(ImageFilter.MinFilter(3))  # 固定サイズ3で最小限の収縮
+        else:
+            knock = alpha_processed
+
         black = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
         layers["char_knock"].paste(black, (x, y), knock)
 
@@ -340,10 +394,10 @@ def make_sheet_layers(
 
     # --- PNG 出力 ---
     for name, img in layers.items():
-        # logosレイヤーは存在する場合のみ保存
-        if name == "logos" and not any(card.get("logo") for card in card_data):
+        # logosレイヤーとlogo_knockレイヤーは存在する場合のみ保存
+        if (name == "logos" or name == "logo_knock") and not any(card.get("logo") for card in card_data):
             continue  # ロゴがない場合はスキップ
-        
+
         path = f"{output_prefix}_{name}.png"
         img.save(path, dpi=(DPI, DPI))
         print("Saved:", path)
@@ -355,6 +409,8 @@ def process_pages(
     sheet_mm: Tuple[float, float],
     output_prefix: str = "sheet",
     output_dir: str = ".",
+    knockout_shrink_mm: float = None,
+    knockout_mode: str = "normal",
 ):
     """画像情報をページ分割して処理する（orderIdごとにグループ化）"""
     import os
@@ -411,7 +467,13 @@ def process_pages(
         page_prefix = os.path.join(page_dir, output_prefix)
         
         # このページのカードを処理（既に展開済みなのでload_imagesは不要）
-        make_sheet_layers(sheet_mm=sheet_mm, card_data=page_cards, output_prefix=page_prefix)
+        make_sheet_layers(
+            sheet_mm=sheet_mm,
+            card_data=page_cards,
+            output_prefix=page_prefix,
+            knockout_shrink_mm=knockout_shrink_mm,
+            knockout_mode=knockout_mode
+        )
         
         print(f"ページ {page_no} 完了: {page_dir}/*.png\n")
 
@@ -439,6 +501,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--one-page", action="store_true", help="ページ分割せず1シートにすべて出力"
     )
+    parser.add_argument(
+        "--knockout-shrink", type=float, default=0.1,
+        help="白板の収縮量(mm)。デフォルト: 0.1mm。0で収縮なし"
+    )
+    parser.add_argument(
+        "--knockout-mode", choices=["normal", "aggressive", "minimal"], default="normal",
+        help="白板処理モード: normal=標準, aggressive=薄い部分も白板化, minimal=最小限の処理"
+    )
     args = parser.parse_args()
 
     try:
@@ -459,12 +529,20 @@ if __name__ == "__main__":
         # 単一ページとして処理
         cards = load_images(image_info)
         output_prefix = os.path.join(args.output_dir, args.prefix)
-        make_sheet_layers(sheet_mm=(w_mm, h_mm), card_data=cards, output_prefix=output_prefix)
+        make_sheet_layers(
+            sheet_mm=(w_mm, h_mm),
+            card_data=cards,
+            output_prefix=output_prefix,
+            knockout_shrink_mm=args.knockout_shrink,
+            knockout_mode=args.knockout_mode
+        )
     else:
         # 複数ページに分割して処理
         process_pages(
             image_info=image_info,
             sheet_mm=(w_mm, h_mm),
             output_prefix=args.prefix,
-            output_dir=args.output_dir
+            output_dir=args.output_dir,
+            knockout_shrink_mm=args.knockout_shrink,
+            knockout_mode=args.knockout_mode
         )
