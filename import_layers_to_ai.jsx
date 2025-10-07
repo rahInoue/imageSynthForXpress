@@ -44,10 +44,9 @@ function processBatch() {
             $.writeln("✗ Error processing folder " + folders[i].name + ": " + e.toString());
         }
         
-        // 各ファイル処理後に少し待機
+        // 各ファイル処理後に少し待機（短縮）
         if (i < folders.length - 1) {
-            $.writeln("Waiting before next file...");
-            $.sleep(2000); // 2秒待機
+            $.sleep(500); // 0.5秒に短縮
         }
     }
 }
@@ -108,9 +107,6 @@ function createAIFromPNGs(pageNo, baseOutputFolder, aiOutputFolder) {
 
             var placedItem = newLayer.placedItems.add();
             placedItem.file = file;
-            
-            // 画像を埋め込み処理にする
-            placedItem.embed();
 
             // 画像を左上に配置（Illustratorの座標系は左下が原点）
             placedItem.position = [0, doc.height];
@@ -118,6 +114,14 @@ function createAIFromPNGs(pageNo, baseOutputFolder, aiOutputFolder) {
             // 画像のサイズを確認し、必要に応じて調整
             placedItem.width = imageWidth;
             placedItem.height = imageHeight;
+
+            // 画像を埋め込み処理にする（位置とサイズ設定後に実行）
+            try {
+                placedItem.embed();
+                $.writeln("  Embedded: " + layerName);
+            } catch(e) {
+                $.writeln("  Warning: Could not embed " + layerName + ": " + e.toString());
+            }
         }
     }
 
@@ -129,6 +133,8 @@ function createAIFromPNGs(pageNo, baseOutputFolder, aiOutputFolder) {
     saveOptions.compatibility = Compatibility.ILLUSTRATOR24;
     saveOptions.compressed = true;
     saveOptions.pdfCompatible = true; // PDF互換性を有効化
+    saveOptions.embedLinkedFiles = true; // リンクファイルを埋め込む
+    saveOptions.embedICCProfile = true; // ICCプロファイルも埋め込む
 
     var outputFile = new File(aiOutputFolder + "/" + pageNo + ".ai");
     doc.saveAs(outputFile, saveOptions);
@@ -136,9 +142,9 @@ function createAIFromPNGs(pageNo, baseOutputFolder, aiOutputFolder) {
     // ドキュメントを閉じる（保存済みなのでSaveOptions.SAVECHANGESは不要）
     doc.close(SaveOptions.DONOTSAVECHANGES);
     
-    // メモリ解放のための小休止
-    $.sleep(1000); // 1秒待機
-    
+    // メモリ解放のための小休止（短縮）
+    $.sleep(200); // 0.2秒に短縮
+
     // ガベージコレクションを促す（JSXでは限定的）
     $.gc();
 }
