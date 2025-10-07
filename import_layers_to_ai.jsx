@@ -108,9 +108,8 @@ function createAIFromPNGs(pageNo, baseOutputFolder, aiOutputFolder) {
             var placedItem = newLayer.placedItems.add();
             placedItem.file = file;
             
-            // メモリ節約のため、画像をリンクとして配置（埋め込みしない）
-            // 必要に応じて後で埋め込むことも可能
-            // placedItem.embed(); // これをコメントアウトしてリンクのまま保持
+            // 画像を埋め込み処理にする
+            placedItem.embed();
 
             // 画像を左上に配置（Illustratorの座標系は左下が原点）
             placedItem.position = [0, doc.height];

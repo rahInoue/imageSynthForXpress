@@ -324,7 +324,7 @@ def make_sheet_layers(
         text_height = rotated_text.height
         
         # ラベル位置の微調整 - デフォルトではカードから離れすぎるため右側へシフト
-        label_right_shift = 350  # ラベルを右に350px移動 - より右寄りに表示
+        label_right_shift = 300  # ラベルを右に300px移動 - 250pxから50px右へ調整
         
         # カットラインの左側の座標（右に移動して画像に近づける）
         text_x = bx1 - label_margin - text_width + label_right_shift

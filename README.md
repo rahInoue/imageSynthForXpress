@@ -46,18 +46,63 @@ npm install
 
 注文データから印刷用ファイルを生成する完全なワークフロー：
 
+#### AIファイル生成までの一括実行（推奨）
+
+```bash
+npm run download-order-images && \
+npm run make-order-images && \
+./process_all.sh -i output/order_images.json
+```
+
+#### ステップごとの実行
+
 ```bash
 # 1. CloudFlare R2から注文の画像をダウンロード
-npm run download-order-images
+node downloadOrderImages.js 202508/2025_order_goods_list.json
 
 # 2. 注文データから画像リストを生成
-npm run make-order-images
+node makeOrderImages.js
 
-# 3. 画像合成・PSD・AI生成を実行
-python3 index.py --images "$(cat output/order_images.json)" --sheet 280x580 --prefix sheet
-node makePSD.js
+# 3. PNGレイヤーを生成（350dpi高解像度）
+python3 index.py --images "$(cat output/order_images.json)" --sheet 280x580
+
+# 4. AIファイルを生成（要Adobe Illustrator）
 ./run_ai.sh
 ```
+
+※ AIファイル生成には macOS環境と Adobe Illustrator が必要です。
+
+#### オプション：注文サマリーシートの生成
+
+各注文の概要を1枚の画像にまとめる場合：
+
+```bash
+node makeOrderSummarySheets.js
+```
+
+### 注文サマリーシートの生成
+
+各注文の概要を1枚の画像にまとめます：
+
+```bash
+# デフォルト設定で実行
+node makeOrderSummarySheets.js
+
+# カスタムパスを指定
+node makeOrderSummarySheets.js \
+  --order-info 202508/202508_order_info.json \
+  --goods-list 202508/2025_order_goods_list.json \
+  --output order_summaries
+```
+
+注文サマリーシートには以下の情報が含まれます：
+- 注文ID、顧客名、ステータス
+- 受取方法（イベント受取/宅配）
+- 宅配の場合：郵便番号、住所、受取人名、電話番号
+- 注文アイテムのサムネイル一覧（最大8個/行）
+- 各アイテムの商品ID、背景有無（BG: ✓/✗）
+- 数量表示（複数の場合 ×2、×3 など）
+- 生成日時
 
 または、統合処理スクリプトで一括実行：
 ```bash
