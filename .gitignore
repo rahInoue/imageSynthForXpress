@@ -8,6 +8,7 @@ node_modules/
 
 # Output directories
 output/
+output_receive*/
 ai_output/
 psd_output/
 order_pdfs/
