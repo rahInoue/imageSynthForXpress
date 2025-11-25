@@ -136,7 +136,7 @@ function extractImagePaths(orderList) {
 async function main() {
   // コマンドライン引数の処理
   const args = process.argv.slice(2);
-  const jsonFile = args[0] || '202508/2025_order_goods_list.json';
+  const jsonFile = args[0] || '202508/2025_order_goods_list.test.json';
   const forceDownload = args.includes('--force');
   
   // 環境変数のチェック

@@ -251,8 +251,8 @@ async function main() {
   try {
     // コマンドライン引数
     const args = process.argv.slice(2);
-    let orderInfoPath = '202508/202508_order_info.json';
-    let goodsListPath = '202508/2025_order_goods_list.json';
+    let orderInfoPath = '202508/202508_order_info.test.json';
+    let goodsListPath = '202508/2025_order_goods_list.test.json';
     let outputDir = 'order_summaries';
 
     // 引数解析

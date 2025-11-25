@@ -9,8 +9,8 @@ const CARDS_PER_ROW = 5;   // 1行あたりのカード数
 const CARD_SPACING = 10;    // カード間のスペース
 
 async function loadOrderData() {
-  const imagesData = JSON.parse(fs.readFileSync('images.json', 'utf8'));
-  const orderInfo = JSON.parse(fs.readFileSync('orderInfo.json', 'utf8'));
+  const imagesData = JSON.parse(fs.readFileSync('images.test.json', 'utf8'));
+  const orderInfo = JSON.parse(fs.readFileSync('orderInfo.test.json', 'utf8'));
   
   // OrderIDごとにグループ化
   const orderGroups = {};
@@ -263,7 +263,7 @@ async function createSummary(orderGroups, orderInfo, outputDir, detailDir) {
     }))
   };
   
-  fs.writeFileSync(path.join(detailDir, 'SUMMARY.json'), JSON.stringify(summary, null, 2));
+  fs.writeFileSync(path.join(detailDir, 'SUMMARY.test.json'), JSON.stringify(summary, null, 2));
   
   // サマリーPDFの作成（英語のみ）
   const pdfDoc = await PDFDocument.create();

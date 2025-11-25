@@ -93,14 +93,14 @@ async function main() {
   // コマンドライン引数の処理
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error('Usage: node downloadFromR2.js <download_images.json> [--output-dir <dir>] [--update-json]');
+    console.error('Usage: node downloadFromR2.js <download_images.test.json> [--output-dir <dir>] [--update-test.json]');
     process.exit(1);
   }
 
   const jsonFile = args[0];
   const outputDirIndex = args.indexOf('--output-dir');
   const outputDir = outputDirIndex >= 0 ? args[outputDirIndex + 1] : 'images';
-  const updateJson = args.includes('--update-json');
+  const updateJson = args.includes('--update-test.json');
 
   // 環境変数のチェック
   if (!process.env.R2_ACCOUNT_ID || !process.env.R2_ACCESS_KEY_ID || !process.env.R2_SECRET_ACCESS_KEY || !process.env.R2_BUCKET_NAME) {
@@ -172,7 +172,7 @@ async function main() {
     
     // JSONファイルの更新（オプション）
     if (updateJson && successful > 0) {
-      const outputJson = jsonFile.replace('.json', '_local.json');
+      const outputJson = jsonFile.replace('.json', '_local.test.json');
       await fs.writeFile(outputJson, JSON.stringify(updatedImageInfo, null, 2));
       console.log(`\nUpdated JSON saved to: ${outputJson}`);
     }

@@ -280,7 +280,7 @@ def process_single_page(args):
         label_margin = mm_to_px(5)
         text_width = rotated_text.width
         text_height = rotated_text.height
-        label_right_shift = 300
+        label_right_shift = 240  # 300pxから60px左へ調整（画像にかぶらないよう）
         text_x = bx1 - label_margin - text_width + label_right_shift
         if text_x < 10:
             text_x = 10

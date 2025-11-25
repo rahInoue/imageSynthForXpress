@@ -132,7 +132,7 @@ fi
 # 必要なNode.jsパッケージの確認（PSD生成は現在不要のためコメントアウト）
 # echo ""
 # echo -e "${YELLOW}3. Node.jsパッケージチェック中...${NC}"
-# if [ -f "package.json" ] && [ -d "node_modules" ]; then
+# if [ -f "package.test.json" ] && [ -d "node_modules" ]; then
 #     if [ -d "node_modules/ag-psd" ] && [ -d "node_modules/canvas" ]; then
 #         echo "  ✓ 必要なパッケージがインストールされています"
 #     else

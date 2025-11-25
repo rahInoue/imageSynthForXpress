@@ -51,20 +51,20 @@ npm install
 ```bash
 npm run download-order-images && \
 npm run make-order-images && \
-./process_all.sh -i output/order_images.json
+./process_all.sh -i output/order_images.test.json
 ```
 
 #### ステップごとの実行
 
 ```bash
 # 1. CloudFlare R2から注文の画像をダウンロード
-node downloadOrderImages.js 202508/2025_order_goods_list.json
+node downloadOrderImages.js 202508/2025_order_goods_list.test.json
 
 # 2. 注文データから画像リストを生成
 node makeOrderImages.js
 
 # 3. PNGレイヤーを生成（350dpi高解像度）
-python3 index.py --images "$(cat output/order_images.json)" --sheet 280x580
+python3 index.py --images "$(cat output/order_images.test.json)" --sheet 280x580
 
 # 4. AIファイルを生成（要Adobe Illustrator）
 ./run_ai.sh
@@ -90,8 +90,8 @@ node makeOrderSummarySheets.js
 
 # カスタムパスを指定
 node makeOrderSummarySheets.js \
-  --order-info 202508/202508_order_info.json \
-  --goods-list 202508/2025_order_goods_list.json \
+  --order-info 202508/202508_order_info.test.json \
+  --goods-list 202508/2025_order_goods_list.test.json \
   --output order_summaries
 ```
 
@@ -107,7 +107,7 @@ node makeOrderSummarySheets.js \
 または、統合処理スクリプトで一括実行：
 ```bash
 # 画像ダウンロードから生成まですべて実行
-npm run download-order-images && npm run make-order-images && ./process_all.sh -i output/order_images.json
+npm run download-order-images && npm run make-order-images && ./process_all.sh -i output/order_images.test.json
 ```
 
 ### CloudFlare R2から画像をダウンロード
@@ -132,10 +132,10 @@ cp .env.example .env
 npm run download-order-images
 
 # 強制ダウンロード（既存ファイルも上書き）
-node downloadOrderImages.js 202508/2025_order_goods_list.json --force
+node downloadOrderImages.js 202508/2025_order_goods_list.test.json --force
 
 # 別のJSONファイルを使用
-node downloadOrderImages.js path/to/order_list.json
+node downloadOrderImages.js path/to/order_list.test.json
 ```
 
 特徴:
@@ -153,7 +153,7 @@ node downloadOrderImages.js path/to/order_list.json
 npm run download-images
 
 # または直接実行
-node downloadFromR2.js download_images.json --output-dir images --update-json
+node downloadFromR2.js download_images.test.json --output-dir images --update-test.json
 ```
 
 オプション:
@@ -169,7 +169,7 @@ node downloadFromR2.js download_images.json --output-dir images --update-json
 npm run make-order-images
 
 # カスタムファイルを指定
-node makeOrderImages.js --order-info 202508/202508_order_info.json --goods-list 202508/2025_order_goods_list.json --output output/order_images.json
+node makeOrderImages.js --order-info 202508/202508_order_info.test.json --goods-list 202508/2025_order_goods_list.test.json --output output/order_images.test.json
 ```
 
 オプション:
@@ -213,7 +213,7 @@ node makeOrderImages.js --order-info 202508/202508_order_info.json --goods-list 
 使用例:
 ```bash
 # カスタム設定で実行
-./process_all.sh -i custom_images.json -s 300x600
+./process_all.sh -i custom_images.test.json -s 300x600
 
 # 単一ページモードで実行
 ./process_all.sh --one-page
@@ -229,7 +229,7 @@ node makeOrderImages.js --order-info 202508/202508_order_info.json --goods-list 
 #### 1. 画像合成（Python版）
 
 ```bash
-python3 index.py --images "$(cat images.json)" --sheet 280x580 --prefix sheet
+python3 index.py --images "$(cat images.test.json)" --sheet 280x580 --prefix sheet
 ```
 
 #### 2. PSD生成（Node.js版）
@@ -357,10 +357,10 @@ PNG画像からAdobe Illustrator形式（.ai）ファイルを生成:
 
 ```bash
 # 複数ページに分割（デフォルト動作）
-python3 index.py --images "$(cat many_images.json)" --sheet 280x580 --prefix sheet --output-dir output
+python3 index.py --images "$(cat many_images.test.json)" --sheet 280x580 --prefix sheet --output-dir output
 
 # 1シートに全て強制出力（はみ出す場合あり）
-python3 index.py --images "$(cat many_images.json)" --sheet 280x580 --prefix sheet --one-page
+python3 index.py --images "$(cat many_images.test.json)" --sheet 280x580 --prefix sheet --one-page
 ```
 
 出力結果:

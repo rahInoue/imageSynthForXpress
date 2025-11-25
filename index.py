@@ -170,6 +170,7 @@ def make_sheet_layers(
     output_prefix: str = "sheet",
     knockout_shrink_mm: float = None,
     knockout_mode: str = "normal",
+    knockout_style: str = "binary",
 ):
     # 引数でパラメータを調整
     shrink_mm = knockout_shrink_mm if knockout_shrink_mm is not None else KNOCKOUT_SHRINK_MM
@@ -317,12 +318,58 @@ def make_sheet_layers(
         # character knockout: キャラクターノックアウト - アルファチャンネルを収縮させて黒シルエット生成
         alpha = char_img.split()[-1]  # アルファチャンネル（透明度情報）を抽出
 
-        # ステップ1: 白板用の完全2値化処理
-        # threshold以下は完全透明、それ以上は完全不透明
-        alpha_processed = alpha.point(lambda p:
-            0 if p < threshold else  # 閾値以下 → 完全透明
-            255  # 閾値以上 → 完全不透明（白板）
-        )
+        # knockout_styleに応じた処理
+        if knockout_style == "gradient":
+            # グレースケール白板：透明度をそのまま反映
+            alpha_processed = alpha.point(lambda p:
+                0 if p < threshold else  # 閾値以下 → 完全透明
+                min(255, int(p * 1.2))  # 閾値以上 → 透明度を少し強調してグレースケール
+            )
+        elif knockout_style == "hybrid":
+            # ハイブリッド：中心は黒、エッジはグラデーション
+            import numpy as np
+            alpha_np = np.array(alpha)
+
+            # コア部分（高透明度）は完全黒
+            core_mask = alpha_np > 200
+            # エッジ部分は元の透明度を維持
+            edge_mask = (alpha_np > threshold) & (alpha_np <= 200)
+
+            result = np.zeros_like(alpha_np)
+            result[core_mask] = 255
+            result[edge_mask] = alpha_np[edge_mask]
+
+            alpha_processed = Image.fromarray(result, mode='L')
+        elif knockout_style == "adaptive":
+            # アダプティブ：画像の特性に応じて自動調整
+            import numpy as np
+            alpha_np = np.array(alpha)
+
+            # ヒストグラムを分析
+            hist, bins = np.histogram(alpha_np[alpha_np > 0], bins=50)
+
+            # 透明度の分布に基づいて処理を決定
+            mean_alpha = np.mean(alpha_np[alpha_np > threshold])
+
+            if mean_alpha > 200:
+                # 不透明が多い → バイナリ処理
+                alpha_processed = alpha.point(lambda p: 0 if p < threshold else 255)
+            elif mean_alpha > 150:
+                # 中間 → ハイブリッド
+                result = np.where(alpha_np > 200, 255,
+                                np.where(alpha_np > threshold, alpha_np, 0))
+                alpha_processed = Image.fromarray(result.astype(np.uint8), mode='L')
+            else:
+                # 半透明が多い → グラデーション
+                alpha_processed = alpha.point(lambda p:
+                    0 if p < threshold else min(255, int(p * 1.5))
+                )
+        else:  # binary (default)
+            # 従来の2値化処理
+            alpha_processed = alpha.point(lambda p:
+                0 if p < threshold else  # 閾値以下 → 完全透明
+                255  # 閾値以上 → 完全不透明（白板）
+            )
 
         # ステップ2: 収縮処理（より穏やかに）
         if shrink_px > 0:
@@ -332,8 +379,17 @@ def make_sheet_layers(
         else:
             knock = alpha_processed
 
-        black = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
-        layers["char_knock"].paste(black, (x, y), knock)
+        # グレースケール白板の場合は、黒の透明度を調整
+        if knockout_style in ["gradient", "hybrid", "adaptive"]:
+            # グレースケールマスクとして使用
+            layers["char_knock"].paste(Image.new("L", CARD_PX, 0), (x, y))
+            knock_layer = Image.new("RGBA", CARD_PX, (0, 0, 0, 0))
+            knock_layer.paste(Image.new("RGB", CARD_PX, (0, 0, 0)), (0, 0), knock)
+            layers["char_knock"].alpha_composite(knock_layer, (x, y))
+        else:
+            # 従来のバイナリ白板
+            black = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
+            layers["char_knock"].paste(black, (x, y), knock)
 
         # glare layer: グレア効果レイヤー - キャラクターのアルファチャンネルをマスクとして黒色で塗りつぶし
         black = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
@@ -377,8 +433,8 @@ def make_sheet_layers(
         text_width = rotated_text.width
         text_height = rotated_text.height
         
-        # ラベル位置の微調整 - デフォルトではカードから離れすぎるため右側へシフト
-        label_right_shift = 300  # ラベルを右に300px移動 - 250pxから50px右へ調整
+        # ラベル位置の微調整 - 画像にかぶらないよう左側に配置
+        label_right_shift = 240  # ラベルを右に240px移動（300pxから60px左へ調整）
         
         # カットラインの左側の座標（右に移動して画像に近づける）
         text_x = bx1 - label_margin - text_width + label_right_shift
@@ -411,6 +467,7 @@ def process_pages(
     output_dir: str = ".",
     knockout_shrink_mm: float = None,
     knockout_mode: str = "normal",
+    knockout_style: str = "binary",
 ):
     """画像情報をページ分割して処理する（orderIdごとにグループ化）"""
     import os
@@ -472,7 +529,8 @@ def process_pages(
             card_data=page_cards,
             output_prefix=page_prefix,
             knockout_shrink_mm=knockout_shrink_mm,
-            knockout_mode=knockout_mode
+            knockout_mode=knockout_mode,
+            knockout_style=knockout_style
         )
         
         print(f"ページ {page_no} 完了: {page_dir}/*.png\n")
@@ -509,6 +567,10 @@ if __name__ == "__main__":
         "--knockout-mode", choices=["normal", "aggressive", "minimal"], default="normal",
         help="白板処理モード: normal=標準, aggressive=薄い部分も白板化, minimal=最小限の処理"
     )
+    parser.add_argument(
+        "--knockout-style", choices=["binary", "gradient", "hybrid", "adaptive"], default="binary",
+        help="白板スタイル: binary=2値化, gradient=グレースケール, hybrid=混合, adaptive=自動"
+    )
     args = parser.parse_args()
 
     try:
@@ -534,7 +596,8 @@ if __name__ == "__main__":
             card_data=cards,
             output_prefix=output_prefix,
             knockout_shrink_mm=args.knockout_shrink,
-            knockout_mode=args.knockout_mode
+            knockout_mode=args.knockout_mode,
+            knockout_style=args.knockout_style
         )
     else:
         # 複数ページに分割して処理
@@ -544,5 +607,6 @@ if __name__ == "__main__":
             output_prefix=args.prefix,
             output_dir=args.output_dir,
             knockout_shrink_mm=args.knockout_shrink,
-            knockout_mode=args.knockout_mode
+            knockout_mode=args.knockout_mode,
+            knockout_style=args.knockout_style
         )

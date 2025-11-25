@@ -302,8 +302,8 @@ async function main() {
   const args = process.argv.slice(2);
   
   // デフォルト値
-  let orderInfoPath = '202508/202508_order_info.json';
-  let goodsListPath = '202508/2025_order_goods_list.json';
+  let orderInfoPath = '202508/202508_order_info.test.json';
+  let goodsListPath = '202508/2025_order_goods_list.test.json';
   let outputDir = 'output';
   
   // 引数の解析
