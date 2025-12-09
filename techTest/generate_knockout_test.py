@@ -31,7 +31,7 @@ from index import (
 )
 
 # knockout処理のパターン定義
-KNOCKOUT_PATTERNS = ["binary", "gradient", "steep"]
+KNOCKOUT_PATTERNS = ["steep_upper1", "steep_upper2", "steep_upper3"]
 
 
 def apply_knockout(alpha: Image.Image, pattern: str, threshold: int = KNOCKOUT_THRESHOLD) -> Image.Image:
@@ -64,6 +64,48 @@ def apply_knockout(alpha: Image.Image, pattern: str, threshold: int = KNOCKOUT_T
         # α値がちょっとでもあれば、より強く黒に寄せる
         # 累乗関数: output = ((α - threshold) / (255 - threshold)) ^ (1/steepness) * 255
         steepness = 2.5  # この値が大きいほど、低αでも黒くなる
+
+        def steep_func(p):
+            if p < threshold:
+                return 0
+            normalized = (p - threshold) / (255 - threshold)
+            steeper = pow(normalized, 1.0 / steepness)
+            return int(min(255, steeper * 255))
+
+        return alpha.point(steep_func)
+
+    elif pattern == "steep_upper1":
+        # パターン4: steepより強調（steepness=3.5）
+        # α値が薄い場合でもより黒く出力
+        steepness = 3.5
+
+        def steep_func(p):
+            if p < threshold:
+                return 0
+            normalized = (p - threshold) / (255 - threshold)
+            steeper = pow(normalized, 1.0 / steepness)
+            return int(min(255, steeper * 255))
+
+        return alpha.point(steep_func)
+
+    elif pattern == "steep_upper2":
+        # パターン5: さらに強調（steepness=5.0）
+        # 半透明でもかなり黒く出力
+        steepness = 5.0
+
+        def steep_func(p):
+            if p < threshold:
+                return 0
+            normalized = (p - threshold) / (255 - threshold)
+            steeper = pow(normalized, 1.0 / steepness)
+            return int(min(255, steeper * 255))
+
+        return alpha.point(steep_func)
+
+    elif pattern == "steep_upper3":
+        # パターン6: 最大強調（steepness=7.0）
+        # 低α値でもほぼ黒に近い出力
+        steepness = 7.0
 
         def steep_func(p):
             if p < threshold:
@@ -285,7 +327,7 @@ def generate_test_sheet(
             knock = knock_smooth.filter(ImageFilter.MinFilter(3))
 
         # グラデーション系の場合はアルファ合成
-        if pattern in ["gradient", "steep"]:
+        if pattern in ["gradient", "steep", "steep_upper1", "steep_upper2", "steep_upper3"]:
             knock_layer = Image.new("RGBA", CARD_PX, (0, 0, 0, 0))
             knock_layer.paste(Image.new("RGB", CARD_PX, (0, 0, 0)), (0, 0), knock)
             layers["char_knock"].alpha_composite(knock_layer, (x, y))
@@ -400,7 +442,10 @@ def main():
     print("\nknockoutパターン:")
     print("  - binary: 2値化（従来方式）α > 20 で完全黒")
     print("  - gradient: αに応じたグラデーション（α値をそのまま使用）")
-    print("  - steep: 傾斜グラデーション（低α値も強く黒に寄せる）")
+    print("  - steep: 傾斜グラデーション（低α値も強く黒に寄せる, steepness=2.5）")
+    print("  - steep_upper1: より強調（steepness=3.5）")
+    print("  - steep_upper2: さらに強調（steepness=5.0）")
+    print("  - steep_upper3: 最大強調（steepness=7.0）")
 
 
 if __name__ == "__main__":

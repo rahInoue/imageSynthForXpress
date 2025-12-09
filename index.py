@@ -46,10 +46,14 @@ def resize_char_canvas(im: Image.Image, target_wh: Tuple[int,int], allow_upscale
     if (new_w, new_h) != (w, h):
         im = im.resize((new_w, new_h), Image.LANCZOS)
     # 中央配置のキャンバスに合成してCARD_PXの厳密サイズにする
+    # alpha_compositeを使用して半透明ピクセルのRGB値を正確に保持
     canvas = Image.new("RGBA", (tw, th), (0,0,0,0))
     x = (tw - im.size[0]) // 2
     y = (th - im.size[1]) // 2
-    canvas.paste(im, (x, y), im)
+    # paste()ではなくalpha_compositeを使用（半透明の発光エフェクトを正確に保持）
+    temp = Image.new("RGBA", (tw, th), (0,0,0,0))
+    temp.paste(im, (x, y))
+    canvas = Image.alpha_composite(canvas, temp)
     return canvas
 
 def resize_bg_canvas(im: Image.Image, target_wh: Tuple[int,int], allow_upscale: bool = ALLOW_UPSCALE_BG) -> Image.Image:
@@ -287,14 +291,19 @@ def make_sheet_layers(
             black_bg = Image.new("RGBA", CARD_PX, (0, 0, 0, 255))
             layers["bg_knock"].paste(black_bg, (x, y), bg_mask)
 
-        # character
-        layers["character"].paste(char_img, (x, y), char_img)
+        # character: alpha_compositeを使用して半透明の発光エフェクトを正しく合成
+        # paste()では半透明ピクセルが薄くなるため、alpha_compositeで正確な合成を行う
+        char_layer = Image.new("RGBA", sheet_size, (0, 0, 0, 0))
+        char_layer.paste(char_img, (x, y))
+        layers["character"] = Image.alpha_composite(layers["character"], char_layer)
         
-        # logo: ロゴ画像（キャラクターの上に配置）
+        # logo: ロゴ画像（キャラクターの上に配置）- 同様にalpha_compositeを使用
         if logo_img_raw:
             # ロゴをカードサイズにリサイズ（レターボックス形式）
             logo_img = resize_char_canvas(logo_img_raw, CARD_PX, allow_upscale=True)
-            layers["logos"].paste(logo_img, (x, y), logo_img)
+            logo_layer = Image.new("RGBA", sheet_size, (0, 0, 0, 0))
+            logo_layer.paste(logo_img, (x, y))
+            layers["logos"] = Image.alpha_composite(layers["logos"], logo_layer)
 
             # logo knockout: ロゴノックアウト - ロゴにも白板を生成
             logo_alpha = logo_img.split()[-1]  # ロゴのアルファチャンネルを抽出
